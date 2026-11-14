@@ -1,0 +1,100 @@
+# Prompt: build your own record shop music finder
+
+## Before you start
+
+Paste the prompt below into Claude (or a similar AI coding assistant) to build your own walk-around record shop. Each day it stocks crates with songs by artists you have never played, based on your Spotify listening and a few genres you choose.
+
+What you need first:
+
+- **Spotify Premium.** Spotify's developer tools have required it since February 2026. A Student plan worked when this was built.
+- **A Spotify developer app.** Log in at developer.spotify.com, open the Dashboard, and create an app. Set the redirect URI to exactly `http://127.0.0.1:8080/callback`, tick **Web API**, and save. Copy the **Client ID** (never the Client secret).
+- **A free Last.fm API key** from last.fm/api/account/create. The app asks for it on first run, so you do not paste it into the prompt.
+- **A Mac or PC with Python 3.** No extra packages are needed.
+
+Fill in the three bracketed lines at the top of the prompt, then paste the whole thing.
+
+## The prompt
+
+Copy everything in the box.
+
+```text
+MY SHOP NAME: [e.g. "Maya's new hits"]
+MY SPOTIFY CLIENT ID: [paste your Client ID]
+MY GENRE CRATES: [e.g. Daft Punk: french house, filter house; also artists similar to Daft Punk | Oldies: oldies, 60s, 50s | Baladas: balada, bolero, balada romantica; also artists similar to José José | Latin/Afro House: afro house, afrohouse, latin house, tribal house]
+
+Build me a personal music discovery app that looks and plays like a small video game set in a cozy record shop. It runs on my own computer and helps me find songs by artists I have never played, using my Spotify listening history.
+
+DELIVERABLE
+- ONE Python 3 file using only the standard library. Running `python3 <file>.py` starts a server on 127.0.0.1:8080, opens my browser, and serves a single HTML page embedded in the file (HTML, CSS and JavaScript all inline).
+- Routes: "/" and "/callback" serve the page. "/lastfm" relays Last.fm API requests as a fallback if the browser cannot call Last.fm directly (send a User-Agent; if SSL certificates fail on macOS, retry with certifi).
+- Print clear messages if port 8080 is already in use. Bind to 127.0.0.1 only.
+- Make it open with a double-click on a Mac. Give the file a `#!/usr/bin/env python3` first line and add a one-time install: running `python3 <file>.py --install` copies the file (byte for byte) to ~/Desktop as "<MY SHOP NAME>.command", makes it executable, removes the com.apple.quarantine attribute if the xattr tool exists (ignore errors), falls back to the home folder if the Desktop cannot be written, and prints where it went. Because the Mac creates that copy itself, macOS does not show the "Apple could not verify" warning for it.
+- If the shop is already running when I double-click it again, open the browser to it and exit instead of showing a port error.
+- Put the setup steps in a comment at the top of the file: open Terminal, type python3 and a space, drag the file into the window, type --install and press Enter, click Allow if macOS asks about Desktop access, then double-click the Desktop copy from then on and close its Terminal window when done.
+- After building, walk me through those same steps in plain language for a non-programmer.
+
+CURRENT SPOTIFY RULES (since February 2026; design around these)
+- Spotify no longer offers recommendations, related artists, audio features, artist top tracks, new releases, popularity or follower counts to new apps. Do not use them.
+- Development Mode needs Premium and allows 5 users. Search returns at most 10 results per call.
+- Create playlists with POST /me/playlists. Add songs with POST /playlists/{id}/items (fall back to /tracks only on a 404). Read playlist contents with GET /playlists/{id}/items.
+- Endpoints I rely on: GET /me, GET /me/top/artists and /me/top/tracks (time_range short_term, medium_term, long_term; limit 50), GET /me/player/recently-played (limit 50), GET /search, GET /me/playlists.
+- Redirect URIs must use 127.0.0.1, not localhost. Redirect localhost visits to 127.0.0.1.
+
+SIGN-IN
+- Spotify Authorization Code with PKCE, no client secret, redirect URI http://127.0.0.1:8080/callback.
+- Scopes: user-top-read user-read-recently-played playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public.
+- Keep tokens in localStorage (wrapped in try/catch), save the granted scope string, refresh tokens automatically, retry once on 401, and wait and retry on 429 using Retry-After.
+- On a 403, tell me to add my own Spotify email under User Management in the developer dashboard.
+- First run: a "Connect Spotify" panel, then a "Add a Last.fm key" panel with three steps for getting a free key at last.fm/api/account/create. Validate that the key is 32 hex characters and test it with one call before saving.
+
+HOW THE SHOP IS STOCKED
+- A "delivery" happens the first time I enter each day and is saved, so revisiting the same day costs no API calls. A "new delivery" action restocks on demand.
+- Build the list of artists and songs I already know from my top artists (all three time ranges), top tracks, and recently played. Never suggest those artists or tracks.
+- Artist crates (10): pick seed artists, 5 at random from my top 15 of the last 4 weeks, 3 from my 6-month top 20, 2 from my long-term top 20, topping up from all lists if needed. For each seed, call Last.fm artist.getSimilar (limit 60), drop artists I know, prefer artists the shop has never shown me (keep a "seen" list in localStorage), rank by match score with random jitter, and fill the crate with up to 5 records.
+- Genre crates (one per genre in MY GENRE CRATES): gather artists from Last.fm tag.getTopArtists for each tag (limit 50, a random page of 1 or 2) plus artist.getSimilar for any "similar to" artists. Alternate between the "similar to" artists and the tag artists so neither crowds out the other. Exclude the "similar to" artists themselves from every crate, plus anyone I know. Prefer unseen artists, fill up to 5 records. A crate built around one artist is titled "Sounds like <artist>".
+- Choosing a song for an artist: get the artist's top tracks from Last.fm artist.getTopTracks, search Spotify for `artist:<name>`, keep only results whose artist name matches exactly (ignoring case, accents, "the" and punctuation) and that I have not played, and pick the first one that matches a Last.fm top track, otherwise the first result. One song per artist, no artist repeated anywhere in a delivery.
+- Show progress ("Unpacking today's delivery: crate 3 of 14") and draw each crate as soon as it is filled. If a delivery fails partway, keep what arrived and say how to retry.
+
+THE GAME
+- A side-view scene drawn on a <canvas> (960 x 576 logical pixels, scaled crisply for retina), with a character I walk left and right with the arrow keys or A/D, or by clicking where to go. Pressing E, the up arrow or Enter interacts with whatever I am standing at; clicking an object walks there and then interacts. A prompt bubble at the top shows "E" and what will happen.
+- Street scene: the shopfront with the shop name on a wooden sign, a striped awning, a window display of records, a door with an Open/Closed card (Closed until setup is done), a potted plant, a chalk sandwich board saying "New stock today" or "Still in stock", a utility pole with wires, and soft city shapes against a late-afternoon sky.
+- Inside (a wide room that scrolls with a smoothly following camera): face-out records on wall shelves, pendant lamps with warm light cones, a chalkboard showing today's delivery count and date, a "Way out" door at the left, a checkout counter with a register, paper bag and turntable, then the 10 artist crates, then a hanging "Explore a genre" sign over the genre crates, delivery boxes, and a big window at the far right with sunbeams, sunlight on the floor and slowly drifting dust.
+- Each crate is a wooden bin whose records show the real album covers fanned above the front panel, with a divider card naming the seed artist (cream cards) or the genre (slate-blue cards). The crate I am standing at is outlined and its card turns orange.
+- The character: a girl with a dark bob, orange headphones, a cream blouse and a long dark skirt, with a simple walk cycle, a gentle idle bob, and a pose holding a record when standing at a crate.
+- Fade to dark between street and shop. Add subtle film grain and a soft vignette over the canvas.
+- Below the canvas: a one-line hint for the controls, a status line, and a "Without walking" row with a link per crate, plus links to request a new delivery, bring back already-seen artists, change the Last.fm key, and disconnect Spotify.
+
+LOOK AND FEEL
+- A lo-fi illustrated anime record-shop mood: warm afternoon light, wood and cream, muted reds and slate blues.
+- Palette: page #EADBC0, paper #F6EEDD, cream #EFE3CB, ink #2B2733, muted ink #6A5E52, rust buttons #B8432A, orange accent #D4512E, slate #3E5A6B, wood #A87445, dark wood #6E4A2E.
+- Typeface: Zen Maru Gothic from Google Fonts for the page and canvas text.
+
+CRATES, LISTENING AND CHECKOUT (HTML <dialog>s styled to match)
+- Crate view: covers standing in a wooden bin; hovering or focusing lifts a record. Clicking one opens the listening station.
+- Listening station: the cover with a vinyl disc sliding out of the sleeve, the song, artist, album and year, "Filed under: if you play X" or "Filed under: the Oldies crate", a Spotify embed player (open.spotify.com/embed/track/<id>), and buttons "Put in my bag" / "Take out of my bag", "Put it back", and "Open in Spotify". Stop the embed when the dialog closes.
+- Bag (opened from the counter or a Bag button over the canvas): the list of songs with "Take out" links, saved in localStorage. Then "Where should these songs go?" with two choices:
+    - A new playlist, with an editable name defaulting to "New hits, <date>", created private.
+    - One of my playlists: a dropdown of playlists I own or that are collaborative (hide ones I only follow), showing song counts, preselecting the last one I used. Before adding, read the playlist's items and skip songs already in it, and say how many were skipped.
+    - If my saved scope lacks playlist permissions, disable the second option and show a "Reconnect Spotify" link explaining my bag stays packed.
+- Confirm with the playlist name and an "Open it in Spotify" link, then empty the bag.
+
+QUALITY
+- Keyboard accessible with visible focus, dialogs close with Escape or a click outside, respects prefers-reduced-motion (no dust, fades or slide-outs), and every canvas action is also reachable from the links under it.
+- Escape all text from APIs (build DOM nodes, never innerHTML with API data).
+- Plain, specific error messages that say what to do next.
+- Before handing it over, write and run an automated end-to-end test with mocked Spotify and Last.fm responses (for example with Playwright) covering: sign-in return, key setup, walking in, opening crates, the listening station, both checkout paths including duplicate skipping, the reconnect prompt, and a second visit the same day making no new requests. Look at screenshots and fix anything that looks wrong.
+```
+
+## Making it your own
+
+The three bracketed lines change the most with the least effort. A few other easy edits to the prompt:
+
+- **Genres:** use Last.fm's genre tags, the words listeners attach to artists ("shoegaze", "afrobeats", "city pop"). Add "also artists similar to X" to point a crate at one artist you love.
+- **Character and look:** rewrite the character line and the palette to match your own reference picture. Attaching an image to your message helps.
+- **Crate counts:** change "10" artist crates or "up to 5 records" per crate. More crates mean longer deliveries and more API calls.
+
+What to expect:
+
+- The first build takes a long reply or two. Ask for fixes one at a time and send screenshots of anything that looks wrong.
+- The automated test only uses simulated data, so the first real delivery is the true test. If it shows an error, paste the message back to the AI.
+- Spotify has changed these rules twice since 2024. If an endpoint stops working, tell the AI the error and ask it to check Spotify's current Web API changelog.
