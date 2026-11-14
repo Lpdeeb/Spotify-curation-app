@@ -32,7 +32,7 @@ A tiny walk-around record shop that stocks itself with music you have never play
 
 ## Setup
 
-1. Open `lilas_new_hits.py` in a text editor, search for `const CLIENT_ID`, and replace the value in quotes with your own Client ID. (The one in the file belongs to the original author's app. Spotify only lets up to 5 approved accounts use an app, so it will not work for you.)
+1. Open `lilas_new_hits.py` in a text editor, search for `const CLIENT_ID`, and replace the value in quotes with your own Client ID. (The one in the file belongs to the original author's app. Spotify only lets up to 10 approved accounts use an app, so it will not work for you.)
 2. On a Mac, open Terminal, type `python3 ` (with a space), drag the file into the window, type ` --install`, and press Enter. This puts a double-clickable **Lila's new hits** on your Desktop. Your Mac makes this copy itself, so you won't get the "Apple could not verify" warning.
 3. Double-click **Lila's new hits**. The shop opens in your browser. Keep the small Terminal window open while you use it, and close it when you're done.
 4. The first time, connect Spotify and paste your Last.fm key. Then walk through the door.
